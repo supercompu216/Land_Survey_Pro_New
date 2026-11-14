@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Land Survey Pro</title>
+<meta name="theme-color" content="#2f7d46">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Land Survey">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
+<style>
+:root{--bg:#f4f6f1;--card:#fff;--tx:#1d2a1f;--mut:#5d6b60;--ac:#2f7d46;--ac2:#e6f2e9;--bd:#d5ddd3;--dg:#b3382c;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);color-scheme:light}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#121813;--card:#1c251e;--tx:#e8efe9;--mut:#9aa89d;--ac:#4cae67;--ac2:#243529;--bd:#2f3c32;--dg:#e5685c;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#121813;--card:#1c251e;--tx:#e8efe9;--mut:#9aa89d;--ac:#4cae67;--ac2:#243529;--bd:#2f3c32;--dg:#e5685c;color-scheme:dark}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{background:var(--ac);color:#fff;padding:14px 16px;font-weight:700;font-size:18px}
+.app-header{display:flex;align-items:center;justify-content:space-between;gap:10px;position:sticky;top:0;z-index:5}
+.install-btn{background:#fff;color:#246438;padding:8px 11px;font-size:13px;white-space:nowrap}
+@media(max-width:380px){.app-header{font-size:16px}.install-btn{padding:7px 8px;font-size:12px}}
+main{max-width:640px;margin:0 auto;padding:12px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:14px;margin-bottom:12px}
+h2{font-size:15px;margin:0 0 10px;color:var(--mut);text-transform:uppercase;letter-spacing:.04em}
+label{display:block;font-size:13px;color:var(--mut);margin:10px 0 4px}
+input,select{width:100%;padding:11px;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--tx);font-size:16px}
+.row{display:flex;gap:8px}.row>*{flex:1;min-width:0}
+button{padding:12px 14px;border:0;border-radius:8px;background:var(--ac);color:#fff;font-size:15px;font-weight:600;cursor:pointer}
+button.sec{background:var(--ac2);color:var(--ac)}
+button.dg{background:transparent;color:var(--dg);padding:6px 8px}
+button.full{width:100%;margin-top:12px}
+.msg{font-size:13px;color:var(--mut);margin-top:6px;min-height:18px}
+#prev{max-width:100%;max-height:220px;border-radius:8px;margin-top:10px;display:none}
+.rec{display:flex;gap:10px;border-top:1px solid var(--bd);padding:10px 0}
+.rec:first-child{border-top:0}
+.rec img,.rec .ph{width:64px;height:64px;border-radius:8px;object-fit:cover;background:var(--ac2);flex:none}
+.rec b{display:block}.rec small{color:var(--mut);display:block}
+.top{display:flex;justify-content:space-between;align-items:center}
+</style>
+</head>
+<body>
+<header class="app-header"><span>🌾 Land Survey Pro</span><button id="installApp" class="install-btn" hidden>Install App</button></header>
+<main>
+<div class="card">
+  <h2>Survey</h2>
+  <div class="row"><select id="sv" aria-label="Select survey"></select><button id="ns" style="flex:none">➕ New survey</button></div>
+  <div class="msg" id="svm">Pick a previous survey to add more records to it, or start a new one.</div>
+</div>
+<div class="card">
+  <h2>New survey record</h2>
+  <button class="sec full" id="gps" style="margin-top:0">📍 Refresh GPS (automatic)</button>
+  <div class="row">
+    <div><label for="x">X (Longitude / Easting)</label><input id="x" inputmode="decimal" placeholder="e.g. 67.0099"></div>
+    <div><label for="y">Y (Latitude / Northing)</label><input id="y" inputmode="decimal" placeholder="e.g. 30.1798"></div>
+  </div>
+  <div class="msg" id="gmsg"></div>
+  <label for="owner">Name of owner</label><input id="owner" autocomplete="off">
+  <label for="father">Father’s name</label><input id="father" autocomplete="off">
+  <label for="area">Total area (acres)</label><input id="area" inputmode="decimal" placeholder="e.g. 12.5">
+  <label>Picture</label>
+  <div class="row">
+    <button class="sec" id="cam">📷 Take photo</button>
+    <button class="sec" id="gal">🖼️ Choose</button>
+  </div>
+  <input type="file" id="fcam" accept="image/*" capture="environment" hidden>
+  <input type="file" id="fgal" accept="image/*" hidden>
+  <img id="prev" alt="Preview">
+  <div class="msg" id="pmsg"></div>
+  <button class="full" id="save">Save record</button>
+  <div class="msg" id="smsg"></div>
+</div>
+<div class="card">
+  <div class="top"><h2 id="cnt">Records (0)</h2><button class="dg" id="clr">Clear all</button></div>
+  <div id="list"></div>
+  <button class="full" id="xl">⬇️ Download Excel with pictures</button>
+  <div class="msg" id="xmsg"></div>
+</div>
+</main>
+<script>
+(function(){
+var $=function(i){return document.getElementById(i)};
+var recs=[],photo=null,db=null,mem=false,surveys=[],cur=null;
+
+// ---- storage (IndexedDB, falls back to memory) ----
+function openDB(){return new Promise(function(res){
+  try{var r=indexedDB.open("landsurvey",2);
+  r.onupgradeneeded=function(){var d=r.result;if(!d.objectStoreNames.contains("r"))d.createObjectStore("r",{keyPath:"id"});if(!d.objectStoreNames.contains("s"))d.createObjectStore("s",{keyPath:"id"})};
+  r.onsuccess=function(){db=r.result;res()};r.onerror=function(){mem=true;res()};
+  }catch(e){mem=true;res()}})}
+function loadAll(){return new Promise(function(res){
+  if(mem||!db)return res([]);
+  try{var q=db.transaction("r").objectStore("r").getAll();
+  q.onsuccess=function(){res(q.result||[])};q.onerror=function(){res([])}}catch(e){res([])}})}
+function put(rec){if(mem||!db)return;try{db.transaction("r","readwrite").objectStore("r").put(rec)}catch(e){}}
+function del(id){if(mem||!db)return;try{db.transaction("r","readwrite").objectStore("r").delete(id)}catch(e){}}
+function putS(s){if(mem||!db)return;try{db.transaction("s","readwrite").objectStore("s").put(s)}catch(e){}}
+function loadS(){return new Promise(function(res){
+  if(mem||!db)return res([]);
+  try{var q=db.transaction("s").objectStore("s").getAll();
+  q.onsuccess=function(){res(q.result||[])};q.onerror=function(){res([])}}catch(e){res([])}})}
+function mkSurvey(n){return{id:Date.now(),name:n,created:Date.now()}}
+function saveCur(){try{localStorage.setItem("ls_cur",String(cur))}catch(e){}}
+function curRecs(){return recs.filter(function(r){return r.sid===cur})}
+function curName(){var s=surveys.filter(function(s){return s.id===cur})[0];return s?s.name:"Survey"}
+
+// ---- GPS ----
+function getPos(){return new Promise(function(res,rej){
+  if(!navigator.geolocation)return rej(new Error("GPS not supported"));
+  navigator.geolocation.getCurrentPosition(res,rej,{enableHighAccuracy:true,timeout:20000,maximumAge:0})})}
+var watchId=null,manual=false;
+function stopWatch(){if(watchId!==null&&navigator.geolocation){navigator.geolocation.clearWatch(watchId)}watchId=null}
+function startWatch(){
+  stopWatch();manual=false;
+  if(!navigator.geolocation){$("gmsg").textContent="GPS not supported. Enter X, Y manually.";return}
+  $("gmsg").textContent="Getting GPS location automatically…";
+  watchId=navigator.geolocation.watchPosition(function(p){
+    if(manual)return;
+    $("x").value=p.coords.longitude.toFixed(6);$("y").value=p.coords.latitude.toFixed(6);
+    $("gmsg").textContent="📡 Live GPS, accuracy ±"+Math.round(p.coords.accuracy)+" m. Updates until you edit X/Y or save.";
+  },function(e){
+    $("gmsg").textContent="Could not get GPS ("+(e.code===1?"permission denied":"signal unavailable")+"). Turn on phone location or enter X, Y manually.";
+  },{enableHighAccuracy:true,maximumAge:0,timeout:20000})}
+$("x").addEventListener("input",function(){manual=true;$("gmsg").textContent="Manual entry. Tap Refresh GPS to switch back to automatic."});
+$("y").addEventListener("input",function(){manual=true;$("gmsg").textContent="Manual entry. Tap Refresh GPS to switch back to automatic."});
+$("gps").onclick=startWatch;
+document.addEventListener("visibilitychange",function(){if(document.hidden)stopWatch();else if(!manual)startWatch()});
+
+// ---- photo (resized to keep storage and Excel small) ----
+function handleFile(f){
+  if(!f)return;
+  var img=new Image(),u=URL.createObjectURL(f);
+  img.onload=function(){
+    var m=800,s=Math.min(1,m/Math.max(img.width,img.height)),c=document.createElement("canvas");
+    c.width=Math.round(img.width*s);c.height=Math.round(img.height*s);
+    c.getContext("2d").drawImage(img,0,0,c.width,c.height);
+    photo=c.toDataURL("image/jpeg",0.8);URL.revokeObjectURL(u);
+    $("prev").src=photo;$("prev").style.display="block";
+    $("pmsg").textContent="Photo added.";
+    if(!$("x").value||!$("y").value){
+      getPos().then(function(p){
+        $("x").value=p.coords.longitude.toFixed(6);$("y").value=p.coords.latitude.toFixed(6);
+        $("pmsg").textContent="Photo added. Location taken from phone (±"+Math.round(p.coords.accuracy)+" m).";
+      }).catch(function(){})}
+  };
+  img.onerror=function(){$("pmsg").textContent="Could not read that image."};
+  img.src=u}
+$("cam").onclick=function(){$("fcam").click()};
+$("gal").onclick=function(){$("fgal").click()};
+$("fcam").onchange=function(e){handleFile(e.target.files[0]);e.target.value=""};
+$("fgal").onchange=function(e){handleFile(e.target.files[0]);e.target.value=""};
+
+// ---- list ----
+function esc(s){var d=document.createElement("div");d.textContent=s;return d.innerHTML}
+function renderSv(){
+  var h="";
+  surveys.slice().reverse().forEach(function(s){
+    var n=recs.filter(function(r){return r.sid===s.id}).length;
+    h+='<option value="'+s.id+'"'+(s.id===cur?' selected':'')+'>'+esc(s.name)+' ('+n+')</option>'});
+  $("sv").innerHTML=h}
+$("sv").onchange=function(){cur=Number($("sv").value);saveCur();render();$("smsg").textContent="Adding records to: "+curName()};
+$("ns").onclick=function(){
+  var n=prompt("Name of the new survey:","Survey "+(surveys.length+1)+" – "+new Date().toLocaleDateString());
+  if(n===null)return;
+  n=n.trim()||"Survey "+(surveys.length+1);
+  var s=mkSurvey(n);surveys.push(s);putS(s);cur=s.id;saveCur();render();
+  $("smsg").textContent="New survey started: "+n};
+function render(){
+  renderSv();
+  var list=curRecs();
+  $("cnt").textContent="Records in this survey ("+list.length+")";
+  var h="";
+  list.slice().reverse().forEach(function(r){
+    h+='<div class="rec">'+(r.photo?'<img src="'+r.photo+'" alt="">':'<div class="ph"></div>')+
+    '<div style="flex:1;min-width:0"><b>'+esc(r.owner)+'</b><small>s/o '+esc(r.father||"—")+' · '+esc(String(r.area))+' acres</small>'+
+    '<small>X '+esc(r.x)+' · Y '+esc(r.y)+'</small><small>'+new Date(r.time).toLocaleString()+'</small></div>'+
+    '<button class="dg" data-id="'+r.id+'">✕</button></div>'});
+  $("list").innerHTML=h||'<div class="msg">No records yet.</div>'}
+$("list").onclick=function(e){
+  var id=e.target.getAttribute&&e.target.getAttribute("data-id");
+  if(id&&confirm("Delete this record?")){recs=recs.filter(function(r){return String(r.id)!==id});del(Number(id));render()}};
+$("clr").onclick=function(){var c=curRecs();if(c.length&&confirm("Delete all records in this survey?")){c.forEach(function(r){del(r.id)});recs=recs.filter(function(r){return r.sid!==cur});render()}};
+
+// ---- save ----
+$("save").onclick=function(){
+  var x=$("x").value.trim(),y=$("y").value.trim(),o=$("owner").value.trim(),f=$("father").value.trim(),a=$("area").value.trim();
+  if(!x||!y||isNaN(Number(x))||isNaN(Number(y)))return $("smsg").textContent="Enter valid X and Y, or use GPS.";
+  if(!o)return $("smsg").textContent="Owner name is required.";
+  if(!a||isNaN(Number(a)))return $("smsg").textContent="Enter total area in acres.";
+  var rec={id:Date.now(),x:x,y:y,owner:o,father:f,area:Number(a),photo:photo,time:Date.now(),sid:cur};
+  recs.push(rec);put(rec);render();
+  ["x","y","owner","father","area"].forEach(function(i){$(i).value=""});
+  photo=null;$("prev").style.display="none";$("pmsg").textContent="";$("gmsg").textContent="";
+  $("smsg").textContent="Saved to "+curName()+" ✓";startWatch();window.scrollTo({top:document.body.scrollHeight,behavior:"smooth"})};
+
+// ---- Excel export ----
+$("xl").onclick=async function(){
+  var rs=curRecs();if(!rs.length)return $("xmsg").textContent="No records in this survey to export.";
+  if(typeof ExcelJS==="undefined")return $("xmsg").textContent="Excel library failed to load. Check your connection.";
+  $("xmsg").textContent="Building Excel file…";
+  try{
+    var wb=new ExcelJS.Workbook(),ws=wb.addWorksheet(curName().replace(/[\[\]:*?\/\\]/g," ").slice(0,31)||"Survey");
+    ws.columns=[{header:"S.No",width:7},{header:"Owner Name",width:24},{header:"Father’s Name",width:24},
+      {header:"Total Area (Acres)",width:18},{header:"X (Longitude)",width:16},{header:"Y (Latitude)",width:16},
+      {header:"Date/Time",width:20},{header:"Picture",width:26}];
+    ws.getRow(1).font={bold:true,color:{argb:"FFFFFFFF"}};
+    ws.getRow(1).fill={type:"pattern",pattern:"solid",fgColor:{argb:"FF2F7D46"}};
+    ws.getRow(1).alignment={vertical:"middle",horizontal:"center"};
+    rs.forEach(function(r,i){
+      var row=ws.addRow([i+1,r.owner,r.father,r.area,Number(r.x),Number(r.y),new Date(r.time).toLocaleString(),""]);
+      row.height=r.photo?110:20;row.alignment={vertical:"middle",wrapText:true};
+      if(r.photo){
+        var id=wb.addImage({base64:r.photo,extension:"jpeg"});
+        ws.addImage(id,{tl:{col:7.1,row:i+1.1},ext:{width:130,height:140}});
+      }});
+    var tot=ws.addRow(["","TOTAL","",rs.reduce(function(s,r){return s+r.area},0)]);tot.font={bold:true};
+    var buf=await wb.xlsx.writeBuffer();
+    var blob=new Blob([buf],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
+    var name=(curName().replace(/[^\w\-]+/g,"_").slice(0,40)||"land-survey")+"-"+new Date().toISOString().slice(0,10)+".xlsx";
+    var dl=null;try{dl=await claude.use("downloads")}catch(e){}
+    if(dl){await dl.save({filename:name,data:blob});$("xmsg").textContent="Excel file ready ✓"}
+    else{var a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();a.remove();
+      $("xmsg").textContent="Download started."}
+  }catch(e){$("xmsg").textContent=(e&&e.code==="declined")?"Download cancelled.":"Export failed: "+(e&&e.message||e)}};
+
+startWatch();
+openDB().then(function(){return Promise.all([loadAll(),loadS()])}).then(function(v){
+  recs=v[0].sort(function(a,b){return a.time-b.time});
+  surveys=v[1].sort(function(a,b){return a.created-b.created});
+  try{cur=Number(localStorage.getItem("ls_cur"))||null}catch(e){}
+  if(!surveys.length){var s0=mkSurvey("Survey 1");surveys.push(s0);putS(s0)}
+  recs.forEach(function(r){if(!r.sid){r.sid=surveys[0].id;put(r)}});
+  if(!surveys.some(function(s){return s.id===cur}))cur=surveys[surveys.length-1].id;
+  render()});
+})();
+</script>
+
+<script>
+(function () {
+  if ("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost")) {
+    window.addEventListener("load", function () {
+      navigator.serviceWorker.register("./service-worker.js").catch(function (err) {
+        console.warn("Offline support could not be enabled:", err);
+      });
+    });
+  }
+  var deferredPrompt = null;
+  var installButton = document.getElementById("installApp");
+  window.addEventListener("beforeinstallprompt", function (event) {
+    event.preventDefault();
+    deferredPrompt = event;
+    if (installButton) installButton.hidden = false;
+  });
+  if (installButton) {
+    installButton.addEventListener("click", async function () {
+      if (!deferredPrompt) return;
+      deferredPrompt.prompt();
+      await deferredPrompt.userChoice;
+      deferredPrompt = null;
+      installButton.hidden = true;
+    });
+  }
+  window.addEventListener("appinstalled", function () {
+    if (installButton) installButton.hidden = true;
+  });
+})();
+</script>
+
+</body>
+</html>
